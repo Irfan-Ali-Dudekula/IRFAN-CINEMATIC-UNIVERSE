@@ -11,7 +11,7 @@ tmdb.language = 'en'
 
 movie_api, discover_api, search_api = Movie(), Discover(), Search()
 
-# --- 2. SESSION STATE (Stability Logic) ---
+# --- 2. SESSION STATE (No-Reset Logic) ---
 if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
 if 'u_name' not in st.session_state:
@@ -48,19 +48,16 @@ def apply_royal_styles():
             animation: shimmer 4s linear infinite;
             text-shadow: 3px 6px 15px rgba(0,0,0,0.5);
             margin-bottom: 20px;
-            letter-spacing: 1px;
         }}
 
         .movie-card {{ 
             border: 1px solid rgba(255, 255, 255, 0.2); 
-            padding: 25px; 
-            border-radius: 20px; 
+            padding: 25px; border-radius: 20px; 
             background: rgba(0, 0, 0, 0.75); 
             backdrop-filter: blur(15px);
             box-shadow: 0 15px 35px rgba(0,0,0,0.8);
-            transition: 0.4s ease;
-            text-align: center;
-            margin-bottom: 20px;
+            transition: 0.4s ease; text-align: center; margin-bottom: 20px;
+            min-height: 680px;
         }}
         
         .movie-card:hover {{
@@ -122,13 +119,24 @@ if not st.session_state.logged_in:
 else:
     st.markdown('<h1 class="royal-title">IRFAN CINEMATIC UNIVERSE</h1>', unsafe_allow_html=True)
     
-    # Sidebar Filters
-    st.sidebar.markdown(f"### 👑 Member: {st.session_state.u_name}")
-    mood_map = {"Happy": 35, "Sad": 18, "Adventures": 12, "Thrill": 53, "Romantic": 10749}
-    lang_map = {"Telugu": "te", "Hindi": "hi", "Tamil": "ta", "English": "en", "Malayalam": "ml"}
+    # --- INTERNAL ALGORITHM MAPPING ---
+    mood_algo = {
+        "Happy": "35,16",       # Comedy + Animation
+        "Sad": "18",            # Drama
+        "Adventure": "12,14",    # Adventure + Fantasy
+        "Thrill": "53,9648,27", # Thriller + Mystery + Horror
+        "Romantic": "10749"     # Romance
+    }
     
-    sel_mood = st.sidebar.selectbox("Choose Mood", ["Select"] + list(mood_map.keys()))
-    sel_lang = st.sidebar.selectbox("Choose Language", ["Select"] + list(lang_map.keys()))
+    lang_map = {
+        "Telugu": "te", "Hindi": "hi", "Tamil": "ta", 
+        "English": "en", "Malayalam": "ml", "Kannada": "kn"
+    }
+
+    # Sidebar: Clean UI (Only Mood & Language)
+    st.sidebar.markdown(f"### 👑 Member: {st.session_state.u_name}")
+    sel_mood = st.sidebar.selectbox("CHOOSE YOUR MOOD", ["Select"] + list(mood_algo.keys()))
+    sel_lang = st.sidebar.selectbox("CHOOSE LANGUAGE", ["Select"] + list(lang_map.keys()))
     
     if st.sidebar.button("Logout"):
         st.session_state.logged_in = False
@@ -136,24 +144,31 @@ else:
 
     query = st.text_input("🔍 Search for a Cinematic Masterpiece...")
 
-    # --- RECTIFIED LOGIC: ZERO-ERROR MOVIE FETCHING ---
+    # --- THE HIDDEN RECOMMENDATION LOGIC ---
     movies_list = []
     if query:
         movies_list = list(search_api.movies(query))
     elif sel_mood != "Select" and sel_lang != "Select":
         raw_discovery = discover_api.discover_movies({
-            'with_genres': mood_map[sel_mood],
+            'with_genres': mood_algo[sel_mood],
             'with_original_language': lang_map[sel_lang],
-            'sort_by': 'popularity.desc'
+            'sort_by': 'popularity.desc',
+            'vote_count.gte': 100 
         })
         movies_list = list(raw_discovery) if raw_discovery else []
     else:
-        movies_list = list(movie_api.popular())
+        # Default: Show popular movies in chosen language if no mood is picked
+        if sel_lang != "Select":
+            movies_list = list(discover_api.discover_movies({
+                'with_original_language': lang_map[sel_lang],
+                'sort_by': 'popularity.desc'
+            }))
+        else:
+            movies_list = list(movie_api.popular())
 
     # --- DISPLAY GRID ---
     if movies_list:
         cols = st.columns(3)
-        # Safe iteration using min() to prevent slicing errors
         limit = min(len(movies_list), 15)
         for i in range(limit):
             movie = movies_list[i]
