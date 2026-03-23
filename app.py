@@ -1,69 +1,111 @@
 import streamlit as st
 from tmdbv3api import TMDb, Movie, Discover, Search
 
-# --- 1. CONFIG (Using Secrets for 100% Success) ---
+# --- 1. CONFIGURATION ---
 st.set_page_config(page_title="IRFAN CINEMATIC UNIVERSE", layout="wide")
 
 tmdb = TMDb()
-# This looks for the secret you just saved in Streamlit Settings
-try:
-    tmdb.api_key = st.secrets["TMDB_API_KEY"]
-except:
-    tmdb.api_key = 'a3ce43541791ff5e752a8e62ce0fcde2' # Fallback
+# Hard-coded for immediate success
+tmdb.api_key = 'a3ce43541791ff5e752a8e62ce0fcde2'
+tmdb.language = 'en'
 
 movie_api, discover_api, search_api = Movie(), Discover(), Search()
 
-# --- 2. SESSION & STYLES ---
-if 'logged_in' not in st.session_state: st.session_state.logged_in = False
-
-def apply_royal_styles():
-    bg_img = "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?q=80&w=2070"
-    st.markdown(f"""
+# --- 2. OLD UI STYLES (Clean & Classic) ---
+def apply_classic_styles():
+    st.markdown("""
         <style>
-        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@900&family=Poppins:wght@400&display=swap');
-        .stApp {{ background: linear-gradient(rgba(0,0,0,0.5), rgba(0,0,0,0.5)), url("{bg_img}"); background-size: cover; background-attachment: fixed; }}
-        .royal-title {{ font-family: 'Playfair Display', serif; font-size: 60px; text-align: center; color: #FCF6BA; text-shadow: 2px 4px 10px #000; }}
-        .movie-card {{ background: rgba(0,0,0,0.8); padding: 20px; border-radius: 15px; border: 1px solid #BF953F; text-align: center; margin-bottom: 20px; }}
-        [data-testid="stSidebar"] {{ background: #000 !important; border-right: 2px solid #BF953F; }}
-        h3, p, span {{ color: white !important; }}
+        .main { background-color: #0e1117; color: white; }
+        .stApp { background: #000000; }
+        .title-text { 
+            text-align: center; color: #FFD700; 
+            font-size: 50px; font-weight: bold; 
+            text-shadow: 2px 2px 4px #444; 
+        }
+        .movie-card {
+            background-color: #1c1c1c;
+            padding: 15px;
+            border-radius: 10px;
+            border: 1px solid #FFD700;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        h3 { color: #FFD700 !important; font-size: 18px; }
+        p { color: #cccccc !important; font-size: 14px; }
         </style>
     """, unsafe_allow_html=True)
 
-apply_royal_styles()
+apply_classic_styles()
 
-# --- 3. LOGIN GATE ---
+# --- 3. THE EXPANDED ALGORITHM ---
+# Mapping friendly names to TMDB Genre IDs
+mood_map = {
+    "Happy / Laughter": "35",
+    "Sad / Emotional": "18",
+    "Thrill / Fear": "53,27",
+    "Mystery / Suspense": "9648",
+    "Action / Bravery": "28,12",
+    "Romantic / Love": "10749",
+    "Sci-Fi / Future": "878",
+    "War / History": "10752,36",
+    "Family / Animation": "10751,16",
+    "Crime / Dark": "80"
+}
+
+lang_map = {
+    "Telugu": "te",
+    "Hindi": "hi",
+    "Tamil": "ta",
+    "English": "en",
+    "Malayalam": "ml",
+    "Kannada": "kn",
+    "Punjabi": "pa"
+}
+
+# --- 4. LOGIN & SIDEBAR ---
+if 'logged_in' not in st.session_state:
+    st.session_state.logged_in = False
+
 if not st.session_state.logged_in:
-    st.markdown('<h1 class="royal-title">IRFAN CINEMATIC UNIVERSE</h1>', unsafe_allow_html=True)
-    u_name = st.text_input("Enter Access Name")
-    if st.button("Access the Vault") and u_name:
+    st.markdown('<h1 class="title-text">IRFAN CINEMATIC UNIVERSE</h1>', unsafe_allow_html=True)
+    name = st.text_input("Enter Access Name:")
+    if st.button("Access Vault") and name:
         st.session_state.logged_in = True
         st.rerun()
 else:
-    st.markdown('<h1 class="royal-title">IRFAN CINEMATIC UNIVERSE</h1>', unsafe_allow_html=True)
+    st.markdown('<h1 class="title-text">IRFAN CINEMATIC UNIVERSE</h1>', unsafe_allow_html=True)
     
-    # Sidebar
-    mood_algo = {"Happy": "35", "Sad": "18", "Thrill": "53"}
-    lang_map = {"Telugu": "te", "Hindi": "hi", "Tamil": "ta", "English": "en"}
+    st.sidebar.header("Filter the Vault")
+    sel_mood = st.sidebar.selectbox("Select Emotion", list(mood_map.keys()))
+    sel_lang = st.sidebar.selectbox("Select Language", list(lang_map.keys()))
     
-    sel_mood = st.sidebar.selectbox("Mood", list(mood_algo.keys()))
-    sel_lang = st.sidebar.selectbox("Language", list(lang_map.keys()))
-    
-    # --- FETCH DATA ---
-    with st.spinner("Accessing TMDB Vault..."):
+    if st.sidebar.button("Logout"):
+        st.session_state.logged_in = False
+        st.rerun()
+
+    # --- 5. THE SEARCH & DISCOVERY ENGINE ---
+    with st.spinner("Searching the Universe..."):
+        # Discovery Logic
         movies = discover_api.discover_movies({
-            'with_genres': mood_algo[sel_mood],
+            'with_genres': mood_map[sel_mood],
             'with_original_language': lang_map[sel_lang],
             'sort_by': 'popularity.desc'
         })
-    
-    # --- DISPLAY ---
-    if movies:
-        cols = st.columns(3)
-        for i, m in enumerate(list(movies)[:12]):
-            with cols[i % 3]:
+        
+        # Force conversion to list to prevent "NoneType" errors
+        movies_list = list(movies) if movies else []
+
+    # --- 6. DISPLAY GRID ---
+    if movies_list:
+        cols = st.columns(4) # 4 movies per row for the old UI look
+        for i, m in enumerate(movies_list[:16]):
+            with cols[i % 4]:
                 st.markdown('<div class="movie-card">', unsafe_allow_html=True)
-                st.image(f"https://image.tmdb.org/t/p/w500{m.poster_path}")
-                st.markdown(f"<h3>{m.title}</h3>", unsafe_allow_html=True)
+                # Fallback for missing posters
+                p_url = f"https://image.tmdb.org/t/p/w500{m.poster_path}" if getattr(m, 'poster_path', None) else "https://via.placeholder.com/500x750?text=No+Poster"
+                st.image(p_url, use_container_width=True)
+                st.markdown(f"<h3>{getattr(m, 'title', 'Unknown Title')}</h3>", unsafe_allow_html=True)
+                st.markdown(f"<p>⭐ {getattr(m, 'vote_average', 0.0)}</p>", unsafe_allow_html=True)
                 st.markdown('</div>', unsafe_allow_html=True)
     else:
-        st.error("API Connection Error: No movies returned. Please check your Secrets settings.")
+        st.error("No movies found for this combination. Please try a different Emotion or Language.")
