@@ -19,7 +19,6 @@ if 'u_name' not in st.session_state:
 
 # --- 3. THE ROYAL FINISH (Custom CSS) ---
 def apply_royal_styles():
-    # Bright/Clear Cinema Background
     bg_img = "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?q=80&w=2070"
     
     st.markdown(f"""
@@ -31,14 +30,12 @@ def apply_royal_styles():
             100% {{ background-position: 200% center; }}
         }}
 
-        /* Background: 40% darkness for Clear Vision of seats */
         .stApp {{ 
             background: linear-gradient(rgba(0,0,0,0.4), rgba(0,0,0,0.4)), url("{bg_img}"); 
             background-size: cover; background-attachment: fixed; 
             font-family: 'Poppins', sans-serif;
         }}
 
-        /* ROYAL SHIMMER HEADING: Gold & Silver Gradient */
         .royal-title {{
             font-family: 'Playfair Display', serif;
             font-size: 65px !important;
@@ -54,17 +51,16 @@ def apply_royal_styles():
             letter-spacing: 1px;
         }}
 
-        /* MOVIE CARDS: Premium Glassmorphism */
         .movie-card {{ 
             border: 1px solid rgba(255, 255, 255, 0.2); 
             padding: 25px; 
             border-radius: 20px; 
-            background: rgba(0, 0, 0, 0.65); 
+            background: rgba(0, 0, 0, 0.75); 
             backdrop-filter: blur(15px);
             box-shadow: 0 15px 35px rgba(0,0,0,0.8);
             transition: 0.4s ease;
             text-align: center;
-            min-height: 650px;
+            margin-bottom: 20px;
         }}
         
         .movie-card:hover {{
@@ -85,7 +81,7 @@ def apply_royal_styles():
         }}
         
         [data-testid="stSidebar"] {{ background: rgba(10, 10, 10, 0.98) !important; border-right: 2px solid #BF953F; }}
-        h3, p, span, label {{ color: #ffffff !important; }}
+        h3, p, span, label, .stMarkdown {{ color: #ffffff !important; }}
         </style>
         """, unsafe_allow_html=True)
 
@@ -140,23 +136,27 @@ else:
 
     query = st.text_input("🔍 Search for a Cinematic Masterpiece...")
 
-    # Logic: Show search results, mood results, or trending movies
-    movies = []
+    # --- RECTIFIED LOGIC: ZERO-ERROR MOVIE FETCHING ---
+    movies_list = []
     if query:
-        movies = search_api.movies(query)
+        movies_list = list(search_api.movies(query))
     elif sel_mood != "Select" and sel_lang != "Select":
-        movies = discover_api.discover_movies({
+        raw_discovery = discover_api.discover_movies({
             'with_genres': mood_map[sel_mood],
             'with_original_language': lang_map[sel_lang],
             'sort_by': 'popularity.desc'
         })
+        movies_list = list(raw_discovery) if raw_discovery else []
     else:
-        movies = movie_api.popular()
+        movies_list = list(movie_api.popular())
 
-    # Display Results in a 3-Column Grid
-    if movies:
+    # --- DISPLAY GRID ---
+    if movies_list:
         cols = st.columns(3)
-        for i, movie in enumerate(movies[:15]):
+        # Safe iteration using min() to prevent slicing errors
+        limit = min(len(movies_list), 15)
+        for i in range(limit):
+            movie = movies_list[i]
             details = get_movie_details(movie.id)
             if not details or not movie.poster_path: continue
             
@@ -176,3 +176,5 @@ else:
                 if details['trailer']: st.video(details['trailer'])
                 if details['ott_l']: st.markdown(f'<a href="{details["ott_l"]}" target="_blank" class="play-button">WATCH NOW</a>', unsafe_allow_html=True)
                 st.markdown('</div>', unsafe_allow_html=True)
+    else:
+        st.warning("The Vault is searching... Please select a Mood and Language or Search.")
