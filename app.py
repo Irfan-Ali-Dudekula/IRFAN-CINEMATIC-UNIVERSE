@@ -1,20 +1,19 @@
 import streamlit as st
 from tmdbv3api import TMDb, Movie, Discover
 
-# --- 1. CONFIG ---
+# --- 1. CORE CONFIG ---
 st.set_page_config(
     page_title="Irfan Cinematic Universe",
     page_icon="🎬",
     layout="wide"
 )
 
-# --- 2. HIDE DEVELOPER TOOLS (Admin Protection) ---
+# --- 2. ADMIN SHIELD & UI CLEANUP ---
 hide_st_style = """
             <style>
             #MainMenu {visibility: hidden;}
             footer {visibility: hidden;}
             header {visibility: hidden;}
-            /* Hides the 'Manage App' and 'Deploy' buttons from users */
             .stDeployButton {display:none;}
             </style>
             """
@@ -23,44 +22,23 @@ st.markdown(hide_st_style, unsafe_allow_html=True)
 tmdb = TMDb()
 tmdb.api_key = 'a3ce43541791ff5e752a8e62ce0fcde2'
 tmdb.language = 'en'
-
 movie_api, discover_api = Movie(), Discover()
 
-# --- 3. THE DATA ENGINE (OTT + Plot) ---
-@st.cache_data(ttl=3600)
-def get_premium_details(m_id):
-    try:
-        res = movie_api.details(m_id, append_to_response="watch/providers")
-        providers = getattr(res, 'watch/providers', {}).get('results', {}).get('IN', {})
-        ott_name = "Theater / Rental"
-        if 'flatrate' in providers:
-            ott_name = providers['flatrate'][0]['provider_name']
-        elif 'free' in providers:
-            ott_name = providers['free'][0]['provider_name']
-            
-        return {
-            "plot": getattr(res, 'overview', "Plot secret remains in the vault."),
-            "ott": ott_name,
-            "rating": getattr(res, 'vote_average', 0.0)
-        }
-    except:
-        return {"plot": "Summary currently unavailable.", "ott": "Check TMDB", "rating": 0.0}
-
-# --- 4. ROYAL STYLES ---
+# --- 3. ROYAL THEATER STYLES ---
 def apply_styles():
     bg_img = "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?q=80&w=2070"
     st.markdown(f"""
         <style>
         @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@900&family=Poppins:wght@400;600&display=swap');
-        .stApp {{ background: linear-gradient(rgba(0,0,0,0.55), rgba(0,0,0,0.55)), url("{bg_img}"); background-size: cover; background-attachment: fixed; }}
+        .stApp {{ background: linear-gradient(rgba(0,0,0,0.7), rgba(0,0,0,0.7)), url("{bg_img}"); background-size: cover; background-attachment: fixed; }}
         
         @keyframes shimmer {{ 0% {{ background-position: -200% center; }} 100% {{ background-position: 200% center; }} }}
         .royal-title {{ font-family: 'Playfair Display', serif; font-size: 60px !important; text-align: center; background: linear-gradient(to right, #BF953F, #FCF6BA, #ffffff, #FCF6BA, #BF953F); background-size: 200% auto; -webkit-background-clip: text; -webkit-text-fill-color: transparent; animation: shimmer 5s linear infinite; margin-bottom: 25px; }}
         
-        .movie-card {{ background: rgba(0, 0, 0, 0.85); padding: 20px; border-radius: 15px; border: 1px solid #BF953F; text-align: center; margin-bottom: 25px; min-height: 720px; }}
+        .movie-card {{ background: rgba(0, 0, 0, 0.85); padding: 20px; border-radius: 15px; border: 1px solid #BF953F; text-align: center; margin-bottom: 25px; min-height: 650px; }}
         h3 {{ color: #FCF6BA !important; margin-bottom: 10px; font-size: 22px; }}
-        .ott-badge {{ background: #BF953F; color: black; padding: 4px 10px; border-radius: 5px; font-weight: 800; font-size: 13px; display: inline-block; margin-bottom: 10px; }}
-        .plot-box {{ color: #ffffff !important; font-size: 14px; text-align: justify; height: 120px; overflow-y: auto; padding: 5px; border-top: 1px solid #333; }}
+        .rating-badge {{ color: #BF953F !important; font-weight: bold; font-size: 18px; }}
+        .plot-box {{ color: #ffffff !important; font-size: 14px; text-align: justify; height: 130px; overflow: hidden; padding: 5px; border-top: 1px solid #333; }}
         [data-testid="stSidebar"] {{ background-color: #000000 !important; border-right: 1px solid #BF953F; }}
         label {{ color: #BF953F !important; font-weight: bold; }}
         </style>
@@ -68,28 +46,25 @@ def apply_styles():
 
 apply_styles()
 
-# --- 5. ADMIN CONTROLS ---
+# --- 4. ADMIN BOOTH ---
 ADMIN_KEY = "irfan_admin_2026"
-is_admin = False
-
 with st.sidebar:
     st.markdown("<h2 style='color:#BF953F;'>Director's Booth</h2>", unsafe_allow_html=True)
     admin_input = st.text_input("Admin Key", type="password")
     if admin_input == ADMIN_KEY:
-        is_admin = True
         st.success("Admin Access Granted")
         if st.button("Clear System Cache"):
             st.cache_data.clear()
             st.rerun()
 
-# --- 6. APP FLOW ---
+# --- 5. APP FLOW ---
 if 'logged_in' not in st.session_state: st.session_state.logged_in = False
 
 if not st.session_state.logged_in:
     st.markdown('<h1 class="royal-title">IRFAN CINEMATIC UNIVERSE</h1>', unsafe_allow_html=True)
     col1, col2, col3 = st.columns([1, 1.5, 1])
     with col2:
-        u_name = st.text_input("ACCESS NAME")
+        u_name = st.text_input("ENTER ACCESS NAME")
         if st.button("UNLOCK THE VAULT 💎") and u_name:
             st.session_state.logged_in = True
             st.rerun()
@@ -107,8 +82,9 @@ else:
         st.session_state.logged_in = False
         st.rerun()
 
-    # --- 7. THE DATA ENGINE ---
-    with st.spinner("Fetching Royal Records..."):
+    # --- 6. DATA ENGINE (Optimized) ---
+    with st.spinner("Accessing the Vault..."):
+        # Fetching everything in one go to prevent black screens
         raw_movies = discover_api.discover_movies({
             'with_genres': mood_map[sel_mood],
             'with_original_language': lang_map[sel_lang],
@@ -116,19 +92,25 @@ else:
         })
         movies_list = list(raw_movies) if raw_movies else []
 
-    # --- 8. DISPLAY GRID ---
+    # --- 7. STABLE DISPLAY GRID ---
     if movies_list:
         cols = st.columns(3)
         for i, m in enumerate(movies_list[:12]):
-            details = get_premium_details(m.id)
             with cols[i % 3]:
                 st.markdown('<div class="movie-card">', unsafe_allow_html=True)
-                img = f"https://image.tmdb.org/t/p/w500{m.poster_path}" if m.poster_path else "https://via.placeholder.com/500x750"
+                
+                # Image Logic
+                img = f"https://image.tmdb.org/t/p/w500{m.poster_path}" if getattr(m, 'poster_path', None) else "https://via.placeholder.com/500x750"
                 st.image(img, use_container_width=True)
-                st.markdown(f"<h3>{m.title}</h3>", unsafe_allow_html=True)
-                st.markdown(f"<div class='ott-badge'>📺 {details['ott']}</div>", unsafe_allow_html=True)
-                st.markdown(f"<p style='color:#BF953F; font-weight:bold;'>⭐ Rating: {details['rating']}</p>", unsafe_allow_html=True)
-                st.markdown(f'<div class="plot-box"><b>STORY:</b> {details["plot"]}</div>', unsafe_allow_html=True)
+                
+                # Info
+                st.markdown(f"<h3>{getattr(m, 'title', 'Untitled')}</h3>", unsafe_allow_html=True)
+                st.markdown(f"<p class='rating-badge'>⭐ Rating: {getattr(m, 'vote_average', 'N/A')}</p>", unsafe_allow_html=True)
+                
+                # Plot
+                plot = getattr(m, 'overview', "Story details are classified in the vault.")
+                st.markdown(f'<div class="plot-box"><b>STORY:</b> {plot}</div>', unsafe_allow_html=True)
+                
                 st.markdown('</div>', unsafe_allow_html=True)
     else:
-        st.info("Vault search active... Choose a different combination.")
+        st.info("Searching... Try a different combination.")
