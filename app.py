@@ -1,3 +1,8 @@
+st.set_page_config(
+    page_title="Irfan Cinematic Universe",
+    page_icon="🎬",
+    layout="wide"
+)
 import streamlit as st
 from tmdbv3api import TMDb, Movie, Discover
 
