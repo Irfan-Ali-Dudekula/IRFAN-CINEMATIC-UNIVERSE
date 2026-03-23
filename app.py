@@ -24,7 +24,25 @@ tmdb.api_key = 'a3ce43541791ff5e752a8e62ce0fcde2'
 tmdb.language = 'en'
 movie_api, discover_api = Movie(), Discover()
 
-# --- 3. ROYAL STYLES ---
+# --- 3. SAFE DATA FETCH (Prevents Black Boxes) ---
+@st.cache_data(ttl=3600)
+def get_safe_details(m_id):
+    try:
+        # We only fetch watch providers to avoid overloading
+        res = movie_api.details(m_id, append_to_response="watch/providers")
+        providers = getattr(res, 'watch/providers', {}).get('results', {}).get('IN', {})
+        
+        ott = "Theater / Rental"
+        if 'flatrate' in providers:
+            ott = providers['flatrate'][0]['provider_name']
+        elif 'free' in providers:
+            ott = providers['free'][0]['provider_name']
+            
+        return {"ott": ott, "rating": getattr(res, 'vote_average', 0.0)}
+    except:
+        return {"ott": "Check TMDB", "rating": 0.0}
+
+# --- 4. ROYAL STYLES ---
 def apply_styles():
     bg_img = "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?q=80&w=2070"
     st.markdown(f"""
@@ -35,29 +53,28 @@ def apply_styles():
         @keyframes shimmer {{ 0% {{ background-position: -200% center; }} 100% {{ background-position: 200% center; }} }}
         .royal-title {{ font-family: 'Playfair Display', serif; font-size: 60px !important; text-align: center; background: linear-gradient(to right, #BF953F, #FCF6BA, #ffffff, #FCF6BA, #BF953F); background-size: 200% auto; -webkit-background-clip: text; -webkit-text-fill-color: transparent; animation: shimmer 5s linear infinite; margin-bottom: 25px; }}
         
-        .movie-card {{ background: rgba(0, 0, 0, 0.85); padding: 20px; border-radius: 15px; border: 1px solid #BF953F; text-align: center; margin-bottom: 25px; min-height: 700px; }}
-        h3 {{ color: #FCF6BA !important; margin-bottom: 10px; font-size: 22px; }}
-        .rating-badge {{ color: #BF953F !important; font-weight: bold; font-size: 18px; }}
-        .plot-box {{ color: #ffffff !important; font-size: 14px; text-align: justify; height: 130px; overflow-y: auto; padding: 5px; border-top: 1px solid #333; }}
+        .movie-card {{ background: rgba(0, 0, 0, 0.85); padding: 20px; border-radius: 15px; border: 1px solid #BF953F; text-align: center; margin-bottom: 25px; min-height: 700px; display: flex; flex-direction: column; justify-content: space-between; }}
+        h3 {{ color: #FCF6BA !important; font-size: 22px; }}
+        .ott-badge {{ background: #BF953F; color: black; padding: 5px 12px; border-radius: 8px; font-weight: 800; font-size: 14px; margin: 10px 0; }}
+        .plot-box {{ color: #ffffff !important; font-size: 14px; text-align: justify; height: 120px; overflow-y: auto; padding: 10px; border-top: 1px solid #333; }}
         [data-testid="stSidebar"] {{ background-color: #000000 !important; border-right: 1px solid #BF953F; }}
-        label {{ color: #BF953F !important; font-weight: bold; }}
         </style>
     """, unsafe_allow_html=True)
 
 apply_styles()
 
-# --- 4. ADMIN CONTROLS ---
+# --- 5. ADMIN BOOTH ---
 ADMIN_KEY = "irfan_admin_2026"
 with st.sidebar:
     st.markdown("<h2 style='color:#BF953F;'>Director's Booth</h2>", unsafe_allow_html=True)
     admin_input = st.text_input("Admin Key", type="password")
     if admin_input == ADMIN_KEY:
         st.success("Admin Access Granted")
-        if st.button("Clear System Cache"):
+        if st.button("Clear Cache & Fix Display"):
             st.cache_data.clear()
             st.rerun()
 
-# --- 5. APP FLOW ---
+# --- 6. APP FLOW ---
 if 'logged_in' not in st.session_state: st.session_state.logged_in = False
 
 if not st.session_state.logged_in:
@@ -71,7 +88,7 @@ if not st.session_state.logged_in:
 else:
     st.markdown('<h1 class="royal-title">IRFAN CINEMATIC UNIVERSE</h1>', unsafe_allow_html=True)
     
-    mood_map = {"Happy / Laughter": "35", "Sad / Emotional": "18", "Thrill": "53,27", "Action": "28", "Romantic": "10749"}
+    mood_map = {"Happy / Comedy": "35", "Sad / Emotional": "18", "Thrill / Action": "53,28", "Romantic": "10749"}
     lang_map = {"Telugu": "te", "Hindi": "hi", "Tamil": "ta", "English": "en", "Malayalam": "ml", "Kannada": "kn"}
 
     c1, c2 = st.columns(2)
@@ -82,34 +99,38 @@ else:
         st.session_state.logged_in = False
         st.rerun()
 
-    # --- 6. THE DATA ENGINE (Optimized & Faster) ---
+    # --- 7. DATA ENGINE ---
     with st.spinner("Accessing Royal Records..."):
         raw_movies = discover_api.discover_movies({
             'with_genres': mood_map[sel_mood],
             'with_original_language': lang_map[sel_lang],
             'sort_by': 'popularity.desc'
         })
-        # Force conversion to list to prevent empty generators
         movies_list = list(raw_movies) if raw_movies else []
 
-    # --- 7. DISPLAY GRID ---
+    # --- 8. STABLE DISPLAY GRID ---
     if movies_list:
         cols = st.columns(3)
         for i, m in enumerate(movies_list[:12]):
+            # Get OTT and Details safely
+            details = get_safe_details(m.id)
+            
             with cols[i % 3]:
                 st.markdown('<div class="movie-card">', unsafe_allow_html=True)
                 
-                # Poster Safety
-                img = f"https://image.tmdb.org/t/p/w500{m.poster_path}" if getattr(m, 'poster_path', None) else "https://via.placeholder.com/500x750"
-                st.image(img, use_container_width=True)
+                # Image
+                poster = f"https://image.tmdb.org/t/p/w500{m.poster_path}" if m.poster_path else "https://via.placeholder.com/500x750"
+                st.image(poster, use_container_width=True)
                 
-                # Title & Rating
-                st.markdown(f"<h3>{getattr(m, 'title', 'Untitled')}</h3>", unsafe_allow_html=True)
-                st.markdown(f"<p class='rating-badge'>⭐ IMDb: {getattr(m, 'vote_average', 'N/A')}</p>", unsafe_allow_html=True)
+                # Content
+                st.markdown(f"<h3>{m.title}</h3>", unsafe_allow_html=True)
+                st.markdown(f"<div class='ott-badge'>📺 {details['ott']}</div>", unsafe_allow_html=True)
+                st.markdown(f"<p style='color:#BF953F; font-weight:bold;'>⭐ Rating: {details['rating']}</p>", unsafe_allow_html=True)
                 
-                # Plot
-                plot_text = getattr(m, 'overview', "Story details are classified.")
-                st.markdown(f'<div class="plot-box"><b>STORY:</b> {plot_text}</div>', unsafe_allow_html=True)
+                # Plot (Using data already in search to avoid extra call)
+                plot_summary = m.overview if m.overview else "Story secret is kept in the vault."
+                st.markdown(f'<div class="plot-box"><b>STORY:</b> {plot_summary}</div>', unsafe_allow_html=True)
+                
                 st.markdown('</div>', unsafe_allow_html=True)
     else:
-        st.info("Vault search active... Choose a different combination.")
+        st.info("Searching the vault... Try a different combination.")
